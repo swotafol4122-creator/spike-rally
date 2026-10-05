@@ -1,0 +1,20 @@
+{
+  "name": "スパイク・ラリー　6人制 戦術バレー",
+  "short_name": "スパイク・ラリー",
+  "description": "スカウトでチームを作り、作戦を立てて大会に挑む6人制バレーボールゲーム",
+  "lang": "ja",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0a171c",
+  "theme_color": "#0a171c",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
