@@ -203,6 +203,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 #match.fpv #say{display:none}
 .dp-fpv .dp-row{width:100%;justify-content:space-between;align-items:flex-end}
 .dp-fpv .big{margin-left:auto}
+.st-note{display:block;margin-top:2px;color:var(--gold)!important;font-weight:700}
 .tipb{min-height:56px;padding:0 18px;border-radius:14px;border:1px solid #3a5f68;background:rgba(16,38,45,.92);font-weight:900;font-size:15px;margin-left:auto}
 .pv-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .pv-box h3{font-size:14px;color:var(--muted)}
@@ -243,11 +244,11 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
   <p>6人制のバレーを、監督とプレーヤーの両方の立場で戦います。大会に勝つとGPがもらえ、試合に出た選手はレベルアップ。GPでスカウトして強いチームを作りましょう。</p>
   <h4>試合中の操作</h4>
   <ul>
-    <li><b>レシーブ</b>　相手が打つと床に黄色い輪（落下点）が出ます。左下のスティックで選手を動かし、輪に入れば拾えます。「切替」で動かす選手を変えられます</li>
+    <li><b>レシーブ</b>　相手が助走に入ると、打ってきそうなコースに赤い矢印（読み）が出ます。打たれる前に左下のスティックで選手を動かしておきましょう。打たれると床に黄色い輪（落下点）が出てスローになるので、輪に入れば拾えます。3割ほどは打つ瞬間にコースを変えてきます。「切替」で動かす選手を変えられます</li>
     <li><b>ブロック</b>　右下で「リード／コミット」と「ストレート／クロス（どちらを締めるか）」を選んでおくと、相手の攻撃に合わせて跳びます</li>
     <li><b>トス</b>　攻撃の選択肢から選びます。枠の色は相手ブロックの予想（緑0枚・黄1枚・赤2枚以上）</li>
     <li><b>スパイク</b>　スパイカーの目線に切り替わります。画面をなぞって照準を動かし、上の白い点が真ん中に来た瞬間に「スパイク！」。赤い壁がブロック、輪の大きさがブレの大きさです。「フェイント」は軟打</li>
-    <li><b>サーブ</b>　サーバーの目線で、ジャンプ／ジャンプフローター／フローターを選び、照準を合わせて「トス」→ 白い点が真ん中に来たら「サーブ！」</li>
+    <li><b>サーブ</b>　サーバーの目線で種類を選び、照準を合わせて「トス」→ 白い点が真ん中に来たら「サーブ！」。ジャンプは強い回転で一番速く崩しやすいが、タイミングが厳しくミスも多い。ジャンプフローターは無回転で途中で揺れる。フローターは遅いが安定</li>
     <li><b>タイムアウト</b>　サーブ前に押すと作戦を変えられます（1セット2回）</li>
   </ul>
   <h4>友達と対戦</h4>
@@ -403,9 +404,9 @@ const VB = (() => {
   const LANE = { left: [70, 70], quick: [55, 505], right: [70, 845], pipe: [330, 450], rback: [330, 790] };
   const TEMPO = { quick: 15, semi: 95, high: 330, back: 200 };
   const SERVE = {
-    jump: { label: 'ジャンプ', apex: 560, jump: 1, base: 2000, add: 900, err: 0.17, spread: 125, wob: 0 },
-    jfloat: { label: 'ジャンプフローター', apex: 470, jump: 0.5, base: 1550, add: 450, err: 0.09, spread: 100, wob: 75 },
-    float: { label: 'フローター', apex: 400, jump: 0, base: 1320, add: 380, err: 0.05, spread: 90, wob: 45 },
+    jump: { label: 'ジャンプ', note: '強い回転で一番速い。崩しやすいがミスも多く、打つタイミングが厳しい', apex: 560, jump: 1, base: 2150, add: 1000, err: 0.3, spread: 125, wob: 0, win: 0.16 },
+    jfloat: { label: 'ジャンプフローター', note: '回転がなく途中で揺れる。速さはそこそこで、ミスは少なめ', apex: 470, jump: 0.5, base: 1600, add: 420, err: 0.14, spread: 95, wob: 40, win: 0.22 },
+    float: { label: 'フローター', note: '遅いがいちばん安定。揺れは小さい', apex: 400, jump: 0, base: 1380, add: 360, err: 0.07, spread: 80, wob: 20, win: 0.3 },
   };
   const ACT = ['', 'pass', 'set', 'attack', 'block', 'serve', 'free'];
   const W = (T, u, v) => ({ x: -T.dir * u, z: T.dir > 0 ? v : C.WID - v });
@@ -629,7 +630,7 @@ const VB = (() => {
     const P = clamp(0.45 + 0.35 * srv + 0.25 * qt + (ch.type === 'jump' && s.sk.has('jserve') ? 0.08 : 0), 0, 1.15);
     const spr = S.spread * (1.15 - 0.6 * qt - 0.35 * srv);
     let tx = aim.x + randn() * spr * 0.7, tz = aim.z + randn() * spr;
-    const miss = rnd() < S.err * (1.25 - qt) * (1.15 - srv) * (agg ? 1.15 : 0.9);
+    const miss = rnd() < S.err * (1.3 - qt) * (1.2 - srv) * (agg ? 1.15 : 0.9);
     touchMark(m, T, s, 'serve'); s.r.srv++;
     const speed = S.base + S.add * P;
     m.events.push({ type: 'touch', a: 'serve', p: s, q: qt, jump: !!S.jump, stype: ch.type, x: b.x, y: b.y, z: b.z });
@@ -638,8 +639,10 @@ const VB = (() => {
     if (miss && rnd() < 0.55) { launchNet(m, speed); return; }
     if (miss) { const ue = UV(R, tx, tz); if (rnd() < 0.6) { const w = W(R, 940 + rnd() * 150, ue.v); tx = w.x; tz = w.z; } else tz = rnd() < 0.5 ? -40 - rnd() * 110 : 940 + rnd() * 110; }
     launchSpeed(m, tx, tz, speed);
-    if (S.wob) b.wob = { a: S.wob * (0.6 + 0.6 * P) * (s.sk.has('fserve') ? 1.3 : 1), w: 7 + rnd() * 5, ph: rnd() * 6.28, t0: m.time };
-    const pressure = ch.type === 'jump' ? clamp(0.28 + 0.55 * P, 0, 1) : clamp((ch.type === 'jfloat' ? 0.36 : 0.28) + 0.35 * srv + (s.sk.has('fserve') ? 0.1 : 0), 0, 1);
+    b.spinV = ch.type === 'jump' ? 30 : ch.type === 'jfloat' ? 0.15 : 0.6;
+    if (S.wob) b.wob = { amp: S.wob * (0.7 + 0.5 * qt) * (s.sk.has('fserve') ? 1.3 : 1) * (rnd() < 0.5 ? -1 : 1), w: 3 + rnd() * 2.5, ph: rnd() * 6.28, t0: m.time, last: 0 };
+    const fs = s.sk.has('fserve');
+    const pressure = ch.type === 'jump' ? clamp(0.3 + 0.6 * P, 0, 1.05) : ch.type === 'jfloat' ? clamp(0.38 + 0.25 * srv + 0.12 * qt + (fs ? 0.08 : 0), 0, 1) : clamp(0.3 + 0.22 * srv + 0.08 * qt + (fs ? 0.06 : 0), 0, 1);
     incoming(m, R, { kind: 'serve', pressure });
   }
 
@@ -687,7 +690,7 @@ const VB = (() => {
       if (!p.grounded || p.state !== 'normal' || p === d.excl) continue;
       if (d.letGo && !(human && p === c.cursor)) continue;
       if (human && m.assist[D.idx] === 'manual' && p !== c.cursor) continue;
-      const dist = hyp(p.x + p.dir * 15 - b.x, p.z - b.z) - (human && p === c.cursor ? 35 : 0);
+      const dist = hyp(p.x + p.dir * 15 - b.x, p.z - b.z) - (human && p === c.cursor ? 40 : 0);
       if (dist < bd) { bd = Math.max(0, dist); best = p; }
     }
     m.rally.inc = null;
@@ -701,9 +704,10 @@ const VB = (() => {
     if (dive) diveNow(m, best, b.x, b.z);
     let q;
     if (d.kind === 'free' || d.kind === 'soft') q = 0.62 + 0.3 * s.rcv + randn() * 0.08;
-    else if (d.kind === 'serve') q = 0.47 + 0.55 * s.rcv - 0.58 * d.pressure + (best.role === 'L' ? 0.04 : 0) + (best.sk.has('recv') ? 0.06 : 0) + randn() * 0.1;
+    else if (d.kind === 'serve') q = 0.66 + 0.5 * (s.rcv - 0.5) - 0.55 * (d.pressure - 0.4) + (best.role === 'L' ? 0.04 : 0) + (best.sk.has('recv') ? 0.06 : 0) + randn() * 0.13;
     else q = 0.32 + 0.55 * s.rcv - 0.4 * Math.max(0, d.power - 0.45) + (d.tip ? 0.3 : 0) + (best.sk.has('dig') ? 0.08 : 0) + randn() * 0.11;
     q -= 0.16 * off + (dive ? 0.22 : 0);
+    if (d.kind === 'serve' && rnd() < clamp(-0.04 + 0.55 * Math.max(0, d.pressure - 0.55) - 0.25 * (s.rcv - 0.5) + 0.18 * off + (dive ? 0.3 : 0) - (best.role === 'L' ? 0.03 : 0), 0, 0.7)) q = Math.min(q, 0.06);
     if (d.kind === 'dig' && !d.tip && rnd() < clamp(0.06 + 0.5 * Math.max(0, d.power - 0.55) - 0.28 * s.rcv + (dive ? 0.25 : 0) + 0.12 * off, 0, 0.85)) q = 0.05;
     recv(m, { p: best, q: clamp(q, 0, 1), kind: d.kind, D: D.idx });
   }
@@ -871,7 +875,13 @@ const VB = (() => {
     }
     D.on.forEach((q, i) => { if (!isBack(i) && !bp.list.some((x) => x.b === q)) { goTo(D, q, 300, clamp(UV(D, q.x, q.z).v, 80, 820)); q.wait = m.time + 0.08; } });
     shadeDefense(m, D, ap.z, bp.shade);
-    m.rally.atk = { A: A.idx, p, o, bp, ap, tAbs, done: false };
+    const plan = !m.human[A.idx] && m.human[D.idx] ? aiAim(m, A, D, p, bp) : null;
+    m.rally.atk = { A: A.idx, p, o, bp, ap, tAbs, done: false, plan };
+    if (plan) {
+      const c = m.ctl[D.idx];
+      const wall = new Set(bp.list.map((x) => x.b)), near = D.on.filter((q) => !wall.has(q) && q.grounded && q.state === 'normal' && q.jumpAt == null).sort((a, q) => hyp(a.x - plan.x, a.z - plan.z) - hyp(q.x - plan.x, q.z - plan.z))[0];
+      if (near) { c.cursor = near; c.manual = false; }
+    }
     m.events.push({ type: 'attackPrep', A: A.idx, p, shade: bp.shade, n: bp.n });
     if (m.human[A.idx]) {
       m.ctl[A.idx].cursor = p;
@@ -914,7 +924,7 @@ const VB = (() => {
       const aim = m.ctl[A.idx].aim || aiAim(m, A, D, R.p, R.bp);
       hitNow(m, R.o.tempo === 'dump' ? 'tip' : 'spike', aim, 0.3);
     } else {
-      const aim = aiAim(m, A, D, R.p, R.bp);
+      const aim = R.plan && rnd() > 0.3 ? R.plan : aiAim(m, A, D, R.p, R.bp);
       hitNow(m, aim.tip || R.o.tempo === 'dump' ? 'tip' : 'spike', aim, clamp(0.5 + 0.38 * R.p.st.atk + randn() * 0.14, 0, 1));
     }
   }
@@ -1109,7 +1119,7 @@ const VB = (() => {
     if (b.held) { holdBall(m); return; }
     const px = b.x;
     b.vy -= C.G * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; b.spin += b.spinV * dt;
-    if (b.wob) b.z += b.wob.a * Math.cos(b.wob.w * (m.time - b.wob.t0) + b.wob.ph) * dt;
+    if (b.wob) { const k = m.time - b.wob.t0, off = b.wob.amp * Math.min(1, k / 0.45) * Math.sin(b.wob.w * k + b.wob.ph); b.z += off - b.wob.last; b.wob.last = off; }
     if (m.phase === 'rally' && px * b.x < 0 && b.y > C.NET) m.rally.crossings++;
     if (b.y < C.BR) {
       b.y = C.BR;
@@ -1133,7 +1143,7 @@ const VB = (() => {
     }
     if (d.type === 'serveHit') {
       if (m.time < d.ideal - 0.4) return false;
-      const q = val && val.q != null ? clamp(+val.q, 0, 1) : clamp(1 - Math.abs(m.time - d.ideal) / 0.22, 0, 1);
+      const q = val && val.q != null ? clamp(+val.q, 0, 1) : clamp(1 - Math.abs(m.time - d.ideal) / (SERVE[d.stype] || SERVE.float).win, 0, 1);
       closeDec(m);
       serveHit(m, { q, aim: val && val.aim });
       return true;
@@ -1164,13 +1174,17 @@ const VB = (() => {
     if (list[0]) { c.cursor = list[0]; c.manual = true; list[0].tx = list[0].x; list[0].tz = list[0].z; }
   }
   function tscale(m) {
-    const d = m.dec, inc = m.rally && m.rally.inc;
-    if (inc && m.human[inc.D] && inc.kind === 'dig' && m.time < inc.t) return 0.6;
-    if (!d || !m.human[d.team]) return 1;
-    if (d.type === 'set') return d.choice == null ? 0.5 : 1;
-    if (d.type === 'spike') return 0.4;
-    if (d.type === 'serveHit') return 0.6;
-    return 1;
+    const d = m.dec, R = m.rally || {}, inc = R.inc, at = R.atk;
+    let s = 1;
+    if (inc && m.human[inc.D] && inc.kind === 'dig' && m.time < inc.t) s = 0.38;
+    if (inc && m.human[inc.D] && inc.kind === 'serve' && m.time < inc.t) s = 0.75;
+    if (at && !at.done && m.human[1 - at.A] && m.time > at.tAbs - 0.5) s = Math.min(s, 0.5);
+    if (d && m.human[d.team]) {
+      if (d.type === 'set') s = Math.min(s, d.choice == null ? 0.5 : 1);
+      else if (d.type === 'spike') s = Math.min(s, 0.4);
+      else if (d.type === 'serveHit') s = Math.min(s, 0.6);
+    }
+    return s;
   }
   function timeout(m, team) {
     const t = team == null ? m.user : team, T = m.teams[t];
@@ -1529,6 +1543,17 @@ const Render = (() => {
     c.lineWidth = 1.5; c.beginPath(); c.ellipse(P.x, P.y, 20 * P.s, 7 * P.s, 0, 0, Math.PI * 2); c.stroke();
     if (inc.out) { c.font = `900 12px ${FU}`; c.fillStyle = '#ff7b6f'; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText('アウト', P.x, P.y - 22 * P.s); }
   }
+  function readMark(c, r, t) {
+    const A = proj(r.fx, 0, r.fz), B = proj(r.tx, 0, r.tz), a = 0.5 + 0.25 * Math.sin(t * 10);
+    c.strokeStyle = `rgba(255,96,80,${a})`; c.lineWidth = 5; c.lineCap = 'round';
+    c.setLineDash([10, 8]); c.beginPath(); c.moveTo(A.x, A.y); c.lineTo(B.x, B.y); c.stroke(); c.setLineDash([]);
+    const ang = Math.atan2(B.y - A.y, B.x - A.x);
+    c.fillStyle = `rgba(255,96,80,${Math.min(1, a + 0.25)})`;
+    c.beginPath(); c.moveTo(B.x, B.y); c.lineTo(B.x - 15 * Math.cos(ang - 0.45), B.y - 15 * Math.sin(ang - 0.45)); c.lineTo(B.x - 15 * Math.cos(ang + 0.45), B.y - 15 * Math.sin(ang + 0.45)); c.closePath(); c.fill();
+    c.strokeStyle = `rgba(255,96,80,${a})`; c.lineWidth = 2; c.beginPath(); c.ellipse(B.x, B.y, 120 * B.s, 40 * B.s, 0, 0, Math.PI * 2); c.stroke();
+    c.font = `900 12px ${FU}`; c.fillStyle = '#ff8a7a'; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    c.fillText(r.tip ? '読み：フェイント' : '読み', B.x, B.y - 42 * B.s);
+  }
   function cursorMark(c, p, col, t) {
     const F0 = proj(p.x, 0, p.z);
     c.strokeStyle = col; c.lineWidth = 3; c.beginPath(); c.ellipse(F0.x, F0.y, 40 * F0.s, 13 * F0.s, 0, 0, Math.PI * 2); c.stroke();
@@ -1763,6 +1788,7 @@ const Render = (() => {
     if (fx.shake > 0 && !reduced) { ox = (Math.random() - 0.5) * fx.shake; oy = (Math.random() - 0.5) * fx.shake; }
     if (bg) c.drawImage(bg, Math.round(ox * dpr), Math.round(oy * dpr));
     c.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
+    if (o.read) readMark(c, o.read, t);
     if (o.inc) landMark(c, o.inc, t);
     const items = [];
     for (let i = 0; i < NET_Z.length - 1; i++) { const z0 = NET_Z[i], z1 = NET_Z[i + 1]; items.push({ z: (z0 + z1) / 2, f: () => netSlice(c, z0, z1) }); }
@@ -2145,7 +2171,7 @@ ${installHTML()}</div>
     }
     const S = VB.SERVE[d.type === 'serve' ? ui.stype : d.stype || ui.stype] || VB.SERVE.float;
     const srv = d.p && d.p.st ? d.p.st.srv : 0.6;
-    const qt = d.type === 'serveHit' ? Math.max(0, 1 - Math.abs(now - d.ideal) / 0.22) : 0.5;
+    const qt = d.type === 'serveHit' ? Math.max(0, 1 - Math.abs(now - d.ideal) / S.win) : 0.5;
     return S.spread * (1.15 - 0.6 * qt - 0.35 * srv);
   }
   const qNow = (d, w) => Math.max(0, Math.min(1, 1 - Math.abs(nowT() - d.ideal) / w));
@@ -2156,7 +2182,7 @@ ${installHTML()}</div>
     const d = localDec();
     if (!d || mode !== 'play') return;
     if (d.type === 'serve' && kind === 'toss') { Sound.click(); sendDec({ type: ui.stype, aim: ui.aim || defaultAim(d) }); }
-    else if (d.type === 'serveHit' && kind === 'serve') { if (nowT() < d.ideal - 0.4) return; sendDec({ aim: ui.aim, q: role === 'guest' ? qNow(d, 0.22) : undefined }); }
+    else if (d.type === 'serveHit' && kind === 'serve') { if (nowT() < d.ideal - 0.4) return; sendDec({ aim: ui.aim, q: role === 'guest' ? qNow(d, (VB.SERVE[d.stype || ui.stype] || VB.SERVE.float).win) : undefined }); }
     else if (d.type === 'spike' && (kind === 'spike' || kind === 'tip')) {
       if (nowT() < d.ideal - 0.4) { early(); return; }
       sendDec({ kind, aim: ui.aim || defaultAim(d), q: role === 'guest' ? qNow(d, 0.25) : undefined });
@@ -2179,7 +2205,7 @@ ${installHTML()}</div>
   function showDec(d) {
     let h = '';
     if (d.type === 'serve') {
-      h = `<div class="dp dp-fpv"><div class="dp-h">サーブ<span>画面をなぞって狙いを動かす</span></div><div class="dp-row"><div class="seg sm" role="group">${Object.entries(VB.SERVE).map(([k, s]) => `<button data-st="${k}" aria-pressed="${ui.stype === k}">${s.label}</button>`).join('')}</div><button class="big" data-fire="toss">トス</button></div></div>`;
+      h = `<div class="dp dp-fpv"><div class="dp-h">サーブ<span>なぞって狙う</span><span id="stNote" class="st-note">${esc(VB.SERVE[ui.stype].note)}</span></div><div class="dp-row"><div class="seg sm" role="group">${Object.entries(VB.SERVE).map(([k, s]) => `<button data-st="${k}" aria-pressed="${ui.stype === k}">${s.label}</button>`).join('')}</div><button class="big" data-fire="toss">トス</button></div></div>`;
     } else if (d.type === 'serveHit') {
       h = '<div class="dp dp-fpv"><div class="dp-h">白い点が真ん中に来た瞬間に打つ<span>輪が小さいほど狙いどおりに飛ぶ</span></div><div class="dp-row"><button class="big" data-fire="serve">サーブ！</button></div></div>';
     } else if (d.type === 'set') {
@@ -2198,7 +2224,7 @@ ${installHTML()}</div>
     Sound.click(); sendDec(i);
     if (role === 'guest') { d.choice = i; ui.decKey = ''; }
   }
-  function setStype(t) { ui.stype = t; for (const b of document.querySelectorAll('#dec [data-st]')) b.setAttribute('aria-pressed', String(b.dataset.st === t)); }
+  function setStype(t) { ui.stype = t; for (const b of document.querySelectorAll('#dec [data-st]')) b.setAttribute('aria-pressed', String(b.dataset.st === t)); const n = $('stNote'); if (n) n.textContent = VB.SERVE[t].note; }
   function syncBlk() {
     for (const b of document.querySelectorAll('#blk [data-bt]')) b.setAttribute('aria-pressed', String(b.dataset.bt === ui.bt));
     for (const b of document.querySelectorAll('#blk [data-sh]')) b.setAttribute('aria-pressed', String(b.dataset.sh === ui.sh));
@@ -2225,7 +2251,9 @@ ${installHTML()}</div>
       return { fpv: { type: d.type === 'spike' ? 'spike' : 'serve', p: d.type === 'spike' ? d.p : v.server, aim: ui.aim, spread: spreadFor(d), now: nowT(), ideal: d.type === 'serve' ? null : d.ideal, bp: d.bp } };
     }
     const inc = role === 'guest' ? g.inc : m.rally.inc && m.rally.inc.D === 0 ? m.rally.inc : null;
-    return { cursor: role === 'guest' ? g.ctl[1].cursor : m.ctl[0].cursor, color: v.teams[lt].color, inc, dec: d };
+    const at = role !== 'guest' && m.rally.atk;
+    const read = at && !at.done && at.plan && at.A === 1 && store.settings.assist !== 'manual' ? { fx: at.p.x, fz: at.p.z, tx: at.plan.x, tz: at.plan.z, tip: !!at.plan.tip } : null;
+    return { cursor: role === 'guest' ? g.ctl[1].cursor : m.ctl[0].cursor, color: v.teams[lt].color, inc, dec: d, read };
   }
 
   /* ---------- できごと（効果音・演出） ---------- */
