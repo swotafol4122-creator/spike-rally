@@ -244,7 +244,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
   <p>6人制のバレーを、監督とプレーヤーの両方の立場で戦います。大会に勝つとGPがもらえ、試合に出た選手はレベルアップ。GPでスカウトして強いチームを作りましょう。</p>
   <h4>試合中の操作</h4>
   <ul>
-    <li><b>レシーブ</b>　相手が助走に入ると、打ってきそうなコースに赤い矢印（読み）が出ます。打たれる前に左下のスティックで選手を動かしておきましょう。打たれると床に黄色い輪（落下点）が出てスローになるので、輪に入れば拾えます。3割ほどは打つ瞬間にコースを変えてきます。「切替」で動かす選手を変えられます</li>
+    <li><b>レシーブ</b>　相手が助走に入ると、打ってきそうなコースに赤い矢印（読み）が出ます。打たれる前に左下のスティックで選手を動かしておきましょう。打たれると床に黄色い輪（落下点）が出てスローになるので、輪に入れば拾えます。2〜3割は打つ瞬間にコースを変えてきます。スティックを倒している間は、その選手を動かし続けます（替えたいときは「切替」）</li>
     <li><b>ブロック</b>　右下で「リード／コミット」と「ストレート／クロス（どちらを締めるか）」を選んでおくと、相手の攻撃に合わせて跳びます</li>
     <li><b>トス</b>　攻撃の選択肢から選びます。枠の色は相手ブロックの予想（緑0枚・黄1枚・赤2枚以上）</li>
     <li><b>スパイク</b>　スパイカーの目線に切り替わります。画面をなぞって照準を動かし、上の白い点が真ん中に来た瞬間に「スパイク！」。赤い壁がブロック、輪の大きさがブレの大きさです。「フェイント」は軟打</li>
@@ -663,12 +663,19 @@ const VB = (() => {
     const re0 = ctx.kind === 'serve' ? 0.16 : ctx.kind === 'free' ? 0.22 : ctx.kind === 'dig' ? 0.17 : 0.2;
     if (human) {
       const near = cands.slice().sort((a, q) => hyp(a.x - cx, a.z - cz) - hyp(q.x - cx, q.z - cz));
-      if (near[0]) { c.cursor = near[0]; c.manual = false; }
+      const cur = cands.includes(c.cursor) ? c.cursor : null;
+      const keep = hyp(c.mv.x, c.mv.z) > 0.15 && !!cur;
+      if (!keep && near[0]) { c.cursor = near[0]; c.manual = false; }
+      const toward = (p, len) => { const d = hyp(cx - p.x, cz - p.z) || 1, s = Math.min(len, d); setTgt(p, p.x + ((cx - p.x) / d) * s, p.z + ((cz - p.z) / d) * s); };
       for (const p of cands) {
+        const dist = hyp(p.x - cx, p.z - cz);
         if (p === c.cursor) {
+          if (keep) continue;
           if (as === 'easy' && !letGo) { p.wait = m.time + re0; setTgt(p, cx - p.dir * 15, cz); }
+          else if (as === 'standard' && !letGo && ctx.kind === 'dig') { p.wait = m.time + 0.06; toward(p, 45); }
           else { p.tx = p.x; p.tz = p.z; }
-        } else if (as !== 'manual' && !letGo && hyp(p.x - cx, p.z - cz) < 300) { p.wait = m.time + re0 + 0.05; setTgt(p, cx - p.dir * 15, cz); }
+        } else if (as !== 'manual' && !letGo && dist < 240) { p.wait = m.time + re0 + 0.05; setTgt(p, cx - p.dir * 15, cz); }
+        else if (ctx.kind === 'dig') { p.wait = m.time + 0.03; toward(p, Math.min(80, dist * 0.25)); }
       }
     } else if (!letGo) {
       let best = null, bm = 1e9;
@@ -690,7 +697,7 @@ const VB = (() => {
       if (!p.grounded || p.state !== 'normal' || p === d.excl) continue;
       if (d.letGo && !(human && p === c.cursor)) continue;
       if (human && m.assist[D.idx] === 'manual' && p !== c.cursor) continue;
-      const dist = hyp(p.x + p.dir * 15 - b.x, p.z - b.z) - (human && p === c.cursor ? 40 : 0);
+      const dist = hyp(p.x + p.dir * 15 - b.x, p.z - b.z) - (human && p === c.cursor ? 34 : 0);
       if (dist < bd) { bd = Math.max(0, dist); best = p; }
     }
     m.rally.inc = null;
@@ -1099,8 +1106,9 @@ const VB = (() => {
       if (mag > 0.15) c.manual = true;
       if (c.manual) {
         const k = Math.min(1, mag), ux = mag > 1e-3 ? mv.x / mag : 0, uz = mag > 1e-3 ? mv.z / mag : 0;
-        const f = Math.min(1, dt * 16);
-        p.vx += (ux * p.run * k - p.vx) * f; p.vz += (uz * p.run * k - p.vz) * f;
+        const inc = m.rally.inc, dash = inc && inc.D === p.team && inc.kind === 'dig' && m.time < inc.t;
+        const f = dash ? 1 : Math.min(1, dt * 16), top = p.run * (dash ? 1.6 : 1);
+        p.vx += (ux * top * k - p.vx) * f; p.vz += (uz * top * k - p.vz) * f;
         p.x += p.vx * dt; p.z += p.vz * dt;
         p.x = p.dir > 0 ? clamp(p.x, -1250, -16) : clamp(p.x, 16, 1250); p.z = clamp(p.z, -150, 1050);
         p.tx = p.x; p.tz = p.z; p.sp2 = hyp(p.vx, p.vz);
@@ -1176,9 +1184,9 @@ const VB = (() => {
   function tscale(m) {
     const d = m.dec, R = m.rally || {}, inc = R.inc, at = R.atk;
     let s = 1;
-    if (inc && m.human[inc.D] && inc.kind === 'dig' && m.time < inc.t) s = 0.38;
+    if (inc && m.human[inc.D] && inc.kind === 'dig' && m.time < inc.t) s = 0.6;
     if (inc && m.human[inc.D] && inc.kind === 'serve' && m.time < inc.t) s = 0.75;
-    if (at && !at.done && m.human[1 - at.A] && m.time > at.tAbs - 0.5) s = Math.min(s, 0.5);
+    if (at && !at.done && m.human[1 - at.A] && m.time > at.tAbs - 0.5) s = Math.min(s, 0.7);
     if (d && m.human[d.team]) {
       if (d.type === 'set') s = Math.min(s, d.choice == null ? 0.5 : 1);
       else if (d.type === 'spike') s = Math.min(s, 0.4);
@@ -1544,15 +1552,24 @@ const Render = (() => {
     if (inc.out) { c.font = `900 12px ${FU}`; c.fillStyle = '#ff7b6f'; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText('アウト', P.x, P.y - 22 * P.s); }
   }
   function readMark(c, r, t) {
-    const A = proj(r.fx, 0, r.fz), B = proj(r.tx, 0, r.tz), a = 0.5 + 0.25 * Math.sin(t * 10);
-    c.strokeStyle = `rgba(255,96,80,${a})`; c.lineWidth = 5; c.lineCap = 'round';
+    const A = proj(r.fx, 0, r.fz), B = proj(r.tx, 0, r.tz), a = 0.65 + 0.25 * Math.sin(t * 10);
+    c.fillStyle = `rgba(255,80,64,${0.2 + 0.08 * Math.sin(t * 10)})`; c.beginPath(); c.ellipse(B.x, B.y, 120 * B.s, 40 * B.s, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = `rgba(255,96,80,${a})`; c.lineWidth = 7; c.lineCap = 'round';
     c.setLineDash([10, 8]); c.beginPath(); c.moveTo(A.x, A.y); c.lineTo(B.x, B.y); c.stroke(); c.setLineDash([]);
     const ang = Math.atan2(B.y - A.y, B.x - A.x);
     c.fillStyle = `rgba(255,96,80,${Math.min(1, a + 0.25)})`;
-    c.beginPath(); c.moveTo(B.x, B.y); c.lineTo(B.x - 15 * Math.cos(ang - 0.45), B.y - 15 * Math.sin(ang - 0.45)); c.lineTo(B.x - 15 * Math.cos(ang + 0.45), B.y - 15 * Math.sin(ang + 0.45)); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(B.x, B.y); c.lineTo(B.x - 20 * Math.cos(ang - 0.45), B.y - 20 * Math.sin(ang - 0.45)); c.lineTo(B.x - 20 * Math.cos(ang + 0.45), B.y - 20 * Math.sin(ang + 0.45)); c.closePath(); c.fill();
     c.strokeStyle = `rgba(255,96,80,${a})`; c.lineWidth = 2; c.beginPath(); c.ellipse(B.x, B.y, 120 * B.s, 40 * B.s, 0, 0, Math.PI * 2); c.stroke();
-    c.font = `900 12px ${FU}`; c.fillStyle = '#ff8a7a'; c.textAlign = 'center'; c.textBaseline = 'bottom';
-    c.fillText(r.tip ? '読み：フェイント' : '読み', B.x, B.y - 42 * B.s);
+  }
+  function readPin(c, r, t) {
+    const F0 = proj(r.tx, 0, r.tz), P = proj(r.tx, 215, r.tz), y = P.y + Math.sin(t * 6) * 3;
+    c.strokeStyle = 'rgba(255,120,100,0.75)'; c.lineWidth = 1.5; c.setLineDash([3, 4]);
+    c.beginPath(); c.moveTo(P.x, y); c.lineTo(F0.x, F0.y); c.stroke(); c.setLineDash([]);
+    c.font = `900 13px ${FU}`;
+    const w = c.measureText(r.label).width + 16;
+    c.fillStyle = 'rgba(205,42,30,0.94)'; rr(c, P.x - w / 2, y - 32, w, 22, 6); c.fill();
+    c.beginPath(); c.moveTo(P.x - 7, y - 11); c.lineTo(P.x + 7, y - 11); c.lineTo(P.x, y - 2); c.closePath(); c.fill();
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(r.label, P.x, y - 21);
   }
   function cursorMark(c, p, col, t) {
     const F0 = proj(p.x, 0, p.z);
@@ -1806,6 +1823,7 @@ const Render = (() => {
     drawParts(c);
     if (o.dec && o.dec.type === 'set' && o.dec.opts) o.dec.opts.forEach((q, i) => { if (q.p) badge(c, q.p, String(i + 1), q.blk === 0 ? '#2fbf71' : q.blk === 1 ? '#f2c230' : '#ef5a4c', o.dec.choice === i); });
     if (o.cursor && m.phase !== 'dead') cursorMark(c, o.cursor, o.color || '#ffd23f', t);
+    if (o.read) readPin(c, o.read, t);
     drawPops(c);
     drawBanner(c);
     if (fx.flash > 0 && !reduced) { c.fillStyle = `rgba(255,255,255,${fx.flash * 0.4})`; c.fillRect(0, 0, cssW, cssH); }
@@ -1994,7 +2012,7 @@ const Render = (() => {
 <button class="tile" data-go="scout"><b>スカウト</b><span>GPで新しい選手を獲得</span></button>
 <button class="tile" data-go="roster"><b>選手一覧</b><span>${store.roster.length}人の選手</span></button>
 <button class="tile" data-go="pvp"><b>友達と対戦</b><span>2台のスマホを直接つないで対戦</span></button>
-<button class="tile" data-act="howto"><b>あそびかた</b><span>操作と戦術のヒント</span></button>
+<button class="tile" data-act="howto"><b>あそびかた</b><span>操作と戦術のヒント（ver ${APP_VER}）</span></button>
 ${installHTML()}</div>
 <section class="setbox"><h3>設定</h3>
 <div class="row"><span class="lab">試合形式</span>${segHTML('set', set.format, { s25: '1セット25点', b15: '2セット先取15点', b25: '2セット先取25点' }).replace(/data-set="/g, 'data-set="format:')}</div>
@@ -2106,6 +2124,7 @@ ${installHTML()}</div>
   }
 
   /* ---------- 試合 v3（操作・照準・対人戦） ---------- */
+  const APP_VER = '3.6';
   let m = null, g = null, mode = 'menu', role = 'solo', acc = 0, last = performance.now(), sayT = 0;
   let hostEv = [], hostSendT = 0, pvStat = '';
   const ui = { aim: null, stype: 'jump', drag: null, mv: { x: 0, z: 0 }, sw: 0, keys: {}, decKey: '', bt: 'read', sh: 'line', sent: 0, stick: null, pend: null };
@@ -2252,7 +2271,7 @@ ${installHTML()}</div>
     }
     const inc = role === 'guest' ? g.inc : m.rally.inc && m.rally.inc.D === 0 ? m.rally.inc : null;
     const at = role !== 'guest' && m.rally.atk;
-    const read = at && !at.done && at.plan && at.A === 1 && store.settings.assist !== 'manual' ? { fx: at.p.x, fz: at.p.z, tx: at.plan.x, tz: at.plan.z, tip: !!at.plan.tip } : null;
+    const read = at && !at.done && at.plan && at.A === 1 && store.settings.assist !== 'manual' ? { fx: at.p.x, fz: at.p.z, tx: at.plan.x, tz: at.plan.z, tip: !!at.plan.tip, label: at.plan.tip || at.o.tempo === 'dump' ? '読み：フェイント' : Math.abs(at.plan.z - at.p.z) < 230 ? '読み：ストレート' : '読み：クロス' } : null;
     return { cursor: role === 'guest' ? g.ctl[1].cursor : m.ctl[0].cursor, color: v.teams[lt].color, inc, dec: d, read };
   }
 
